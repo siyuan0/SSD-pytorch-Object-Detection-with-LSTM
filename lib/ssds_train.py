@@ -54,7 +54,8 @@ class Solver(object):
             self.priors.cuda()
             cudnn.benchmark = True
             # if torch.cuda.device_count() > 1:
-                # self.model = torch.nn.DataParallel(self.model).module
+            #     self.para_model = torch.nn.DataParallel(self.model)
+            #     self.model = self.para_model.module
 
         # Print the model architecture and parameters
         print('Model architectures:\n{}\n'.format(self.model))
