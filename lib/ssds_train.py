@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import division
 import numpy as np
 import os
 import sys
@@ -49,16 +50,27 @@ class Solver(object):
         self.use_gpu = torch.cuda.is_available()
         if self.use_gpu:
             print('Utilize GPUs for computation')
-            print('Number of GPU available', torch.cuda.device_count())
+            for GPU_ID in range(torch.cuda.device_count()):
+                print('Using GPU: %s' %(torch.cuda.get_device_name(GPU_ID)))
+            # print('Number of GPU available', torch.cuda.device_count())
             self.model.cuda()
             self.priors.cuda()
             cudnn.benchmark = True
-            if torch.cuda.device_count() > 1: # comment off this part if it doesn't work
-                self.para_model = torch.nn.DataParallel(self.model)
-                self.model = self.para_model
+            # if torch.cuda.device_count() > 1: # comment off this part if it doesn't work
+            #     self.para_model = torch.nn.DataParallel(self.model)
+            #     self.model = self.para_model
+            #     # print(self.trainable_param(cfg.TRAIN.TRAINABLE_SCOPE))
+            #     # quit()
+            #     print(vars(self.model))
+            #     # print(vars(self.model.module))
+            #     # for param in self.model.parameters():
+            #     #     print('dataparallel: '+ str(param.size()))
+            #     # for param in self.model.module.parameters():
+            #     #     print('non-dataparallel: '+ str(param.size()))
+            #     quit()
 
-        # Print the model architecture and parameters
-        print('Model architectures:\n{}\n'.format(self.model))
+        # # Print the model architecture and parameters
+        # print('Model architectures:\n{}\n'.format(self.model))
 
         # print('Parameters and size:')
         # for name, param in self.model.named_parameters():
@@ -267,7 +279,7 @@ class Solver(object):
 
     def train_epoch(self, model, data_loader, optimizer, criterion, writer, epoch, use_gpu):
         model.train()
-
+        print('dataset size: %d' %len(data_loader.dataset))
         epoch_size = len(data_loader)
         batch_iterator = iter(data_loader)
 
@@ -292,7 +304,7 @@ class Solver(object):
             loss_l, loss_c = criterion(out, targets)
 
             # some bugs in coco train2017. maybe the annonation bug.
-            if loss_l.data[0] == float("Inf"):
+            if loss_l.item() == float("Inf"):
                 continue
 
             loss = loss_l + loss_c
@@ -300,13 +312,13 @@ class Solver(object):
             optimizer.step()
 
             time = _t.toc()
-            loc_loss += loss_l.data[0]
-            conf_loss += loss_c.data[0]
+            loc_loss += loss_l.item()
+            conf_loss += loss_c.item()
 
             # log per iter
             log = '\r==>Train: || {iters:d}/{epoch_size:d} in {time:.3f}s [{prograss}] || loc_loss: {loc_loss:.4f} cls_loss: {cls_loss:.4f}\r'.format(
                     prograss='#'*int(round(10*iteration/epoch_size)) + '-'*int(round(10*(1-iteration/epoch_size))), iters=iteration, epoch_size=epoch_size,
-                    time=time, loc_loss=loss_l.data[0], cls_loss=loss_c.data[0])
+                    time=time, loc_loss=loss_l.item(), cls_loss=loss_c.item())
 
             sys.stdout.write(log)
             sys.stdout.flush()
@@ -472,7 +484,7 @@ class Solver(object):
         empty_array = np.transpose(np.array([[],[],[],[],[]]),(1,0))
 
         _t = Timer()
-
+        fps_list = [] #to track fps for calculation of average fps
         for i in iter(range((num_images))):
             img = dataset.pull_image(i)
             scale = [img.shape[1], img.shape[0], img.shape[1], img.shape[0]]
@@ -508,9 +520,10 @@ class Solver(object):
             log = '\r==>Test: || {iters:d}/{epoch_size:d} in {time:.3f}s [{prograss}]\r'.format(
                     prograss='#'*int(round(10*i/num_images)) + '-'*int(round(10*(1-i/num_images))), iters=i, epoch_size=num_images,
                     time=time)
+            fps_list.append(1/time)            
             sys.stdout.write(log)
             sys.stdout.flush()
-
+        print('Average fps: {fps:.3f}'.format(fps=np.mean(np.array(fps_list)))) #print the average fps for this epoch
         # write result to pkl
         with open(os.path.join(output_dir, 'detections.pkl'), 'wb') as f:
             pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
