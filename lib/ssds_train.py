@@ -33,6 +33,13 @@ class Solver(object):
     def __init__(self):
         self.cfg = cfg
 
+        # Build model
+        print('===> Building model')
+        self.model, self.priorbox = create_model(cfg.MODEL)
+        quit()
+        self.priors = Variable(self.priorbox.forward(), volatile=True)
+        self.detector = Detect(cfg.POST_PROCESS, self.priors)
+
         # Load data
         print('===> Loading data')
         self.train_loader = load_data(cfg.DATASET, 'train') if 'train' in cfg.PHASE else None
@@ -40,11 +47,7 @@ class Solver(object):
         self.test_loader = load_data(cfg.DATASET, 'test') if 'test' in cfg.PHASE else None
         self.visualize_loader = load_data(cfg.DATASET, 'visualize') if 'visualize' in cfg.PHASE else None
 
-        # Build model
-        print('===> Building model')
-        self.model, self.priorbox = create_model(cfg.MODEL)
-        self.priors = Variable(self.priorbox.forward(), volatile=True)
-        self.detector = Detect(cfg.POST_PROCESS, self.priors)
+
 
         # Utilize GPUs for computation
         self.use_gpu = torch.cuda.is_available()

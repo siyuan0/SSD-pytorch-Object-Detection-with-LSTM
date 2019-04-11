@@ -7,6 +7,7 @@ from lib.modeling.ssds import rfb_lite
 from lib.modeling.ssds import fssd
 from lib.modeling.ssds import fssd_lite
 from lib.modeling.ssds import yolo
+from lib.modeling.ssds import ssd_lite_RNN
 
 ssds_map = {
                 'ssd': ssd.build_ssd,
@@ -17,6 +18,7 @@ ssds_map = {
                 'fssd_lite': fssd_lite.build_fssd_lite,
                 'yolo_v2': yolo.build_yolo_v2,
                 'yolo_v3': yolo.build_yolo_v3,
+                'ssd_lite_RNN': ssd_lite_RNN.build_ssd_lite_RNN,
             }
 
 # nets part
@@ -47,10 +49,11 @@ import torch
 
 def _forward_features_size(model, img_size):
     model.eval()
-    x = torch.rand(1, 3, img_size[0], img_size[1])
+    x = torch.rand(10, 3, img_size[0], img_size[1])
     x = torch.autograd.Variable(x, volatile=True) #.cuda()
     feature_maps = model(x, phase='feature')
-    return [(o.size()[2], o.size()[3]) for o in feature_maps]
+    # return [o.size() for o in feature_maps]
+    return [(o.size()[1],o.size()[2],o.size()[3]) for o in feature_maps]
 
 
 def create_model(cfg):
