@@ -35,8 +35,6 @@ class SSDLite_RNN(nn.Module):
 
         self.feature_layer = feature_layer[0]
 
-    def init_hidden(self, batch_size = 32):
-        print(batch_size)
 
 
     def forward(self, x, phase='eval', use_RNN=False):
@@ -113,6 +111,9 @@ def add_extras(base, feature_layer, mbox, num_classes):
         if layer == 'S':
             extra_layers += [ _conv_dw(in_channels, depth, stride=2, padding=1, expand_ratio=1) ]
             in_channels = depth
+        elif layer == 'L':
+            extra_layers += [ LSTM_conv_dw(in_channels, depth, conv_dw_stride=2, conv_dw_padding=1, conv_dw_expand_ratio=1) ]
+            in_channels = depth
         elif layer == '':
             extra_layers += [ _conv_dw(in_channels, depth, stride=1, expand_ratio=1) ]
             in_channels = depth
@@ -141,27 +142,7 @@ def _conv_dw(inp, oup, stride=1, padding=0, expand_ratio=1):
         nn.BatchNorm2d(oup),
     )
 
-class LSTM_conv_dw(nn.Module):
-# implementation of bottleneck-LSTM as described in http://openaccess.thecvf.com/content_cvpr_2018/papers/Liu_Mobile_Video_Object_CVPR_2018_paper.pdf
-     
-    def __init__(self, inp, oup, stride=1, padding=0, expand_ratio=1, 
-                 use_LSTM=False, batch_size=32):
-        super(LSTM_conv_dw,self).__init__()
-        self._conv_dw = _conv_dw(inp, oup, stride=stride, padding=padding, expand_ratio=expand_ratio)
-        self.cell_state = None #should have shape: (batch_size, oup, (height+padding-2)/stride, (width+padding-2)/stride)
-        self.pre_output = None
 
-    def forward(input):
-    # the option to turn off the LSTM portion is to allow for initial training as a non temporally-aware Neural Net
-    # if use_LSTM=False, this class behaves the same as _conv_dw
-    # Args: input:  tensor in shape of (batch_size, n_channels, height, width)
-        if use_LSTM:
-            input = self._conv_dw(input)
-            merged_inp = torch.cat((input,pre_output),dim=1)
-
-        else:
-            self.pre_output = self._conv_dw(input)
-            return self.pre_output
 
 def build_ssd_lite_RNN(base, feature_layer, mbox, num_classes):
     base_, extras_, head_ = add_extras(base(), feature_layer, mbox, num_classes)
