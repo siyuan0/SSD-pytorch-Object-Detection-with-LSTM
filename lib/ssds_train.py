@@ -36,7 +36,7 @@ class Solver(object):
         # Build model
         print('===> Building model')
         self.model, self.priorbox = create_model(cfg.MODEL)
-        quit()
+        
         self.priors = Variable(self.priorbox.forward(), volatile=True)
         self.detector = Detect(cfg.POST_PROCESS, self.priors)
 

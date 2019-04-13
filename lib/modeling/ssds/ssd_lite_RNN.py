@@ -35,7 +35,9 @@ class SSDLite_RNN(nn.Module):
 
         self.feature_layer = feature_layer[0]
 
-
+        for k, v in enumerate(self.extras):
+            print(v.__class__.__name__)
+        quit()
 
     def forward(self, x, phase='eval', use_RNN=False):
         """Applies network layers and ops on input image(s) x.

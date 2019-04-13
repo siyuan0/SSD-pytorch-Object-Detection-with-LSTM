@@ -45,6 +45,14 @@ class LSTM_conv_dw(nn.Module):
                                         sample_input.size()[2], sample_input.size()[3])
         self.cell_initialized = True
 
+    def reset_cell_state(self): 
+    # resets the LSTM cell state. Cell state will automatically re-initialize during next forward
+    # use .__class__.__name__ to find this layer
+        self.batch_size = 0
+        self.cell_state = None
+        self.pre_output = None
+        self.cell_initialized = False   
+
     def forward(self, input):
     # the option to turn off the LSTM portion is to allow for initial training as a non temporally-aware Neural Net
     # if use_LSTM=False, this class behaves the same as _conv_dw
@@ -53,6 +61,8 @@ class LSTM_conv_dw(nn.Module):
             #merging new info with previous output
             input = self._conv_dw(input)
             if self.cell_initialized == False: self.init_cell_state(input) #initializes cell state if not yet initialized
+            print(self.pre_output.size())
+            print(input.size())
             merged_inp = torch.cat((input,self.pre_output),dim=1)
             merged_inp = self.conv_bottleneck(merged_inp)
             

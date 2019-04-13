@@ -9,7 +9,7 @@ MODEL:
   ASPECT_RATIOS: [[1, 2, 3], [1, 2, 3], [1, 2, 3], [1, 2, 3], [1, 2], [1, 2]]
 
 TRAIN:
-  USE_LSTM_ATER_EPOCH: 0
+  USE_LSTM_AFTER_EPOCH: 0
   MAX_EPOCHS: 301
   CHECKPOINTS_EPOCHS: 1
   BATCH_SIZE: 32
@@ -48,4 +48,4 @@ DATASET:
 EXP_DIR: './experiments/models/ssd_mobilenet_v2_custom'
 LOG_DIR: './experiments/models/ssd_mobilenet_v2_custom'
 RESUME_CHECKPOINT: './weights/custom/mobilenet_v2_ssd_lite_custom.pth'
-PHASE: ['test']
+PHASE: ['train']
