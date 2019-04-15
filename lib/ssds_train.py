@@ -47,7 +47,7 @@ class Solver(object):
         self.test_loader = load_data(cfg.DATASET, 'test') if 'test' in cfg.PHASE else None
         self.visualize_loader = load_data(cfg.DATASET, 'visualize') if 'visualize' in cfg.PHASE else None
 
-
+        self.backprop_steps = cfg.MODEL.RNN.BACKPROP_STEPS if cfg.MODEL.RNN.IN_USE else False #for RNN use, to track how far back to backprop
 
         # Utilize GPUs for computation
         self.use_gpu = torch.cuda.is_available()
@@ -245,7 +245,11 @@ class Solver(object):
             if epoch > warm_up:
                 self.exp_lr_scheduler.step(epoch-warm_up)
             if 'train' in cfg.PHASE:
-                self.train_epoch(self.model, self.train_loader, self.optimizer, self.criterion, self.writer, epoch, self.use_gpu)
+                if epoch < self.cfg.MODEL.RNN.USE_LSTM_AFTER_EPOCH:
+                    with modules.LSTM.no_LSTM(): # perform the first few epoch without any use of LSTM
+                        self.train_epoch(self.model, self.train_loader, self.optimizer, self.criterion, self.writer, epoch, self.use_gpu)
+                else:
+                    self.train_epoch(self.model, self.train_loader, self.optimizer, self.criterion, self.writer, epoch, self.use_gpu)
             if 'eval' in cfg.PHASE:
                 self.eval_epoch(self.model, self.eval_loader, self.detector, self.criterion, self.writer, epoch, self.use_gpu)
             if 'test' in cfg.PHASE:
@@ -291,6 +295,8 @@ class Solver(object):
         _t = Timer()
 
         for iteration in iter(range((epoch_size))):
+            
+
             images, targets = next(batch_iterator)
             if use_gpu:
                 images = Variable(images.cuda())
@@ -300,8 +306,9 @@ class Solver(object):
                 targets = [Variable(anno, volatile=True) for anno in targets]
             _t.tic()
             # forward
+            
             out = model(images, phase='train')
-
+            
             # backprop
             optimizer.zero_grad()
             loss_l, loss_c = criterion(out, targets)
@@ -311,7 +318,10 @@ class Solver(object):
                 continue
 
             loss = loss_l + loss_c
-            loss.backward()
+            if self.backprop_steps: 
+                loss.backward(retain_graph = True)
+            else:
+                loss.backward()
             optimizer.step()
 
             time = _t.toc()

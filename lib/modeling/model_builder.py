@@ -8,6 +8,7 @@ from lib.modeling.ssds import fssd
 from lib.modeling.ssds import fssd_lite
 from lib.modeling.ssds import yolo
 from lib.modeling.ssds import ssd_lite_RNN
+from lib.layers.modules import LSTM
 
 ssds_map = {
                 'ssd': ssd.build_ssd,
@@ -52,8 +53,10 @@ def _forward_features_size(model, img_size):
     x = torch.rand(10, 3, img_size[0], img_size[1])
     x = torch.autograd.Variable(x, volatile=True) #.cuda()
     feature_maps = model(x, phase='feature')
-    # return [o.size() for o in feature_maps]
-    return [(o.size()[1],o.size()[2],o.size()[3]) for o in feature_maps]
+    #resets model
+    model = LSTM.reset_model_LSTM(model)
+
+    return [(o.size()[2],o.size()[3]) for o in feature_maps]
 
 
 def create_model(cfg):
@@ -62,8 +65,10 @@ def create_model(cfg):
     #
     base = networks_map[cfg.NETS]
     number_box= [2*len(aspect_ratios) if isinstance(aspect_ratios[0], int) else len(aspect_ratios) for aspect_ratios in cfg.ASPECT_RATIOS]  
-        
-    model = ssds_map[cfg.SSDS](base=base, feature_layer=cfg.FEATURE_LAYER, mbox=number_box, num_classes=cfg.NUM_CLASSES)
+    if cfg.RNN.IN_USE:
+        model = ssds_map[cfg.SSDS](base=base, feature_layer=cfg.FEATURE_LAYER, mbox=number_box, num_classes=cfg.NUM_CLASSES, backprop_steps=cfg.RNN.BACKPROP_STEPS)
+    else:
+        model = ssds_map[cfg.SSDS](base=base, feature_layer=cfg.FEATURE_LAYER, mbox=number_box, num_classes=cfg.NUM_CLASSES)
     #
     feature_maps = _forward_features_size(model, cfg.IMAGE_SIZE)
     print('==>Feature map size:')

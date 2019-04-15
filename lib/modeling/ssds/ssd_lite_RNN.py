@@ -34,10 +34,7 @@ class SSDLite_RNN(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
 
         self.feature_layer = feature_layer[0]
-
-        for k, v in enumerate(self.extras):
-            print(v.__class__.__name__)
-        quit()
+        
 
     def forward(self, x, phase='eval', use_RNN=False):
         """Applies network layers and ops on input image(s) x.
@@ -76,7 +73,7 @@ class SSDLite_RNN(nn.Module):
 
         # apply extra layers and cache source layer outputs
         for k, v in enumerate(self.extras):
-            x = F.relu(v(x), inplace=True)
+            x = F.relu(v(x), inplace=False)
             sources.append(x)
             # if k % 2 == 1:
             #     sources.append(x)
@@ -104,7 +101,7 @@ class SSDLite_RNN(nn.Module):
         return output
 
 
-def add_extras(base, feature_layer, mbox, num_classes):
+def add_extras(base, feature_layer, mbox, num_classes, backprop_steps = 10):
     extra_layers = []
     loc_layers = []
     conf_layers = []
@@ -114,7 +111,7 @@ def add_extras(base, feature_layer, mbox, num_classes):
             extra_layers += [ _conv_dw(in_channels, depth, stride=2, padding=1, expand_ratio=1) ]
             in_channels = depth
         elif layer == 'L':
-            extra_layers += [ LSTM_conv_dw(in_channels, depth, conv_dw_stride=2, conv_dw_padding=1, conv_dw_expand_ratio=1) ]
+            extra_layers += [ LSTM_conv_dw(in_channels, depth, conv_dw_stride=2, conv_dw_padding=1, conv_dw_expand_ratio=1, backprop_steps =10) ]
             in_channels = depth
         elif layer == '':
             extra_layers += [ _conv_dw(in_channels, depth, stride=1, expand_ratio=1) ]
@@ -146,6 +143,6 @@ def _conv_dw(inp, oup, stride=1, padding=0, expand_ratio=1):
 
 
 
-def build_ssd_lite_RNN(base, feature_layer, mbox, num_classes):
-    base_, extras_, head_ = add_extras(base(), feature_layer, mbox, num_classes)
+def build_ssd_lite_RNN(base, feature_layer, mbox, num_classes, backprop_steps = 10):
+    base_, extras_, head_ = add_extras(base(), feature_layer, mbox, num_classes, backprop_steps)
     return SSDLite_RNN(base_, extras_, head_, feature_layer, num_classes)

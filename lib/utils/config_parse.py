@@ -75,6 +75,15 @@ __C.MODEL.CLIP = True
 # FSSD setting, NUM_FUSED for fssd
 __C.MODEL.NUM_FUSED = 3
 
+# ---------------------------------------------------------------------------- #
+# RNN options
+# ---------------------------------------------------------------------------- #
+__C.MODEL.RNN = AttrDict()
+__C.MODEL.RNN.IN_USE = False
+# only start using LSTM in training after this point. LSTM should be should be used from start during eval
+__C.MODEL.RNN.USE_LSTM_AFTER_EPOCH = 0
+# timestep to indicate how far back autograd to track for backpropagation
+__C.MODEL.RNN.BACKPROP_STEPS = 10
 
 # ---------------------------------------------------------------------------- #
 # Train options
@@ -90,8 +99,7 @@ __C.TRAIN.BATCH_SIZE = 128
 # trainable scope and resuming scope
 __C.TRAIN.TRAINABLE_SCOPE = 'base,extras,norm,loc,conf'
 __C.TRAIN.RESUME_SCOPE = ''
-# only start using LSTM in training after this point. LSTM should be should be used from start during eval
-__C.TRAIN.USE_LSTM_AFTER_EPOCH = 0
+
 # ---------------------------------------------------------------------------- #
 # optimizer options
 # ---------------------------------------------------------------------------- #
