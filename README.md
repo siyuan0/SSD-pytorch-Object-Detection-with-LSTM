@@ -17,3 +17,6 @@ In addition, various core files were modified to accomodate the inclusion of the
 
 ## Data
 ---to continue work here---
+
+## Effect of LSTM
+So far it looks like the LSTM layers causes the mAP to drop, while increasing the fps. I haven't really ran this out on the proper imagenet vid dataset, so proper evidence for this is lacking. Just something observed while working on this.
