@@ -41,6 +41,7 @@ def voc_ap(rec, prec, use_07_metric=False):
     if use_07_metric:
         # 11 point metric
         ap = 0.
+        
         for t in np.arange(0., 1.1, 0.1):
             if np.sum(rec >= t) == 0:
                 p = 0
@@ -71,7 +72,8 @@ def voc_eval(detpath,
              classname,
              cachedir,
              ovthresh=0.5,
-             use_07_metric=False):
+             use_07_metric=False,
+             printout=True):
     """rec, prec, ap = voc_eval(detpath,
                                 annopath,
                                 imagesetfile,
@@ -105,17 +107,16 @@ def voc_eval(detpath,
     with open(imagesetfile, 'r') as f:
         lines = f.readlines()
     imagenames = [x.strip() for x in lines]
-
     if not os.path.isfile(cachefile):
         # load annots
         recs = {}
         for i, imagename in enumerate(imagenames):
             recs[imagename] = parse_rec(annopath.format(imagename))
             if i % 100 == 0:
-                print('Reading annotation for {:d}/{:d}'.format(
+                if printout: print('Reading annotation for {:d}/{:d}'.format(
                     i + 1, len(imagenames)))
         # save
-        print('Saving cached annotations to {:s}'.format(cachefile))
+        if printout: print('Saving cached annotations to {:s}'.format(cachefile))
         with open(cachefile, 'wb') as f:
             pickle.dump(recs, f)
     else:
@@ -173,6 +174,105 @@ def voc_eval(detpath,
             ih = np.maximum(iymax - iymin + 1., 0.)
             inters = iw * ih
 
+                # union
+            uni = ((bb[2] - bb[0] + 1.) * (bb[3] - bb[1] + 1.) +
+                   (BBGT[:, 2] - BBGT[:, 0] + 1.) *
+                   (BBGT[:, 3] - BBGT[:, 1] + 1.) - inters)
+
+            overlaps = inters / uni
+            ovmax = np.max(overlaps)
+            jmax = np.argmax(overlaps)
+
+        if ovmax > ovthresh:
+            if not R['difficult'][jmax]:
+                if not R['det'][jmax]:
+                    tp[d] = 1.
+                    R['det'][jmax] = 1
+                else:
+                    fp[d] = 1.
+        else:
+            fp[d] = 1.
+
+        # compute precision recall
+    fp = np.cumsum(fp)
+    tp = np.cumsum(tp)
+    rec = tp / float(npos)
+        # avoid divide by zero in case the first detection matches a difficult
+        # ground truth
+    prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
+    ap = voc_ap(rec, prec, use_07_metric)
+
+    return rec, prec, ap
+
+def voc_intermittent_eval(boxes,
+                         annopath,
+                         imagesetfile,
+                         classname,
+                         ovthresh=0.5,
+                         use_07_metric=False,
+                         img_id=None):
+
+
+    # read list of images
+    with open(imagesetfile, 'r') as f:
+        lines = f.readlines()
+    imagenames = [x.strip() for x in lines]
+    recs = {}
+    for i, imagename in enumerate(imagenames):
+        recs[imagename] = parse_rec(annopath.format(imagename))
+
+    # extract gt objects for this class
+    class_recs = {}
+    # for imagename in imagenames:
+    R = [obj for obj in recs[img_id] if obj['name'] == classname]
+    bbox = np.array([x['bbox'] for x in R])
+    difficult = np.array([x['difficult'] for x in R]).astype(np.bool)
+    det = [False] * len(R)
+    npos = sum(~difficult)
+    class_recs[img_id] = {'bbox': bbox,
+                             'difficult': difficult,
+                             'det': det}
+
+    # read dets
+    
+    if len(boxes) != 0:
+        confidence = np.array([float(x[-1]) for x in boxes])
+        BB = np.array([[float(z) for z in x[0:4]] for x in boxes])
+    else:
+        #if no boxes detected
+        if len(class_recs[img_id]['bbox'])==0:
+            #if there are really no boxes to detect
+            return 1,1,1
+        else:
+            #if there are some boxes to detect, but none got detected
+            return 0, 0, 0
+
+        # sort by confidence
+    sorted_ind = np.argsort(-confidence)
+    sorted_scores = np.sort(-confidence)
+    BB = BB[sorted_ind, :]
+
+        # go down dets and mark TPs and FPs
+    nd = len(confidence)
+    tp = np.zeros(nd)
+    fp = np.zeros(nd)
+
+    for d in range(nd):
+        R = class_recs[img_id]
+        bb = BB[d, :].astype(float)
+        ovmax = -np.inf
+        BBGT = R['bbox'].astype(float)
+
+        if BBGT.size > 0:
+            # compute overlaps
+            # intersection
+            ixmin = np.maximum(BBGT[:, 0], bb[0])
+            iymin = np.maximum(BBGT[:, 1], bb[1])
+            ixmax = np.minimum(BBGT[:, 2], bb[2])
+            iymax = np.minimum(BBGT[:, 3], bb[3])
+            iw = np.maximum(ixmax - ixmin + 1., 0.)
+            ih = np.maximum(iymax - iymin + 1., 0.)
+            inters = iw * ih
                 # union
             uni = ((bb[2] - bb[0] + 1.) * (bb[3] - bb[1] + 1.) +
                    (BBGT[:, 2] - BBGT[:, 0] + 1.) *

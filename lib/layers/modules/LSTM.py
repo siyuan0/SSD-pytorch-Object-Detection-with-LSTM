@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 CONTEXT = {'use LSTM': True}
 
@@ -20,9 +21,18 @@ def reset_model_LSTM(model):
     for name, module in reset_model.named_children():
         try:
             module.reset_cell_state()
-        except:
+        except AttributeError:
             reset_model_LSTM(module)
+    return reset_model
 
+def trigger_TBPTT_model_LSTM(model, step_back):
+#search through a model for LSTM layers and trigger their TBPTT
+    for name, module in model.named_children():
+        try:
+            module.TBPTT(step_back)
+        except AttributeError:
+            trigger_TBPTT_model_LSTM(module, step_back)
+    return model
 
 class LSTM_conv_dw(nn.Module):
 # implementation of bottleneck-LSTM as described in http://openaccess.thecvf.com/content_cvpr_2018/papers/Liu_Mobile_Video_Object_CVPR_2018_paper.pdf
@@ -44,15 +54,19 @@ class LSTM_conv_dw(nn.Module):
         self.conv_input2cell = nn.Conv2d(self.oup_channels, self.oup_channels, 1, 1, 0)
         self.conv_outputgate = nn.Conv2d(self.oup_channels, self.oup_channels, 1, 1, 0)
         self.backprop_steps = backprop_steps
+        self.forget_bias = 1.0
 
 
     def init_cell_state(self, sample_input):
     # initializes the cell_state and creates a dummy pre_output
     # Args: input:  tensor in shape of (batch_size, n_channels, height, width)
         self.batch_size = sample_input.size()[0]
-        self.cell_state = [torch.empty(self.batch_size, self.oup_channels, 
-                                        sample_input.size()[2], sample_input.size()[3])]
-        self.pre_output = [torch.empty(self.batch_size, self.oup_channels, 
+        #cell_state will store botht the old cell_state and new one for each forward
+        self.cell_state = [[torch.zeros(self.batch_size, self.oup_channels, 
+                                        sample_input.size()[2], sample_input.size()[3]),
+                            torch.zeros(self.batch_size, self.oup_channels, 
+                                        sample_input.size()[2], sample_input.size()[3])]]
+        self.pre_output = [torch.zeros(self.batch_size, self.oup_channels, 
                                         sample_input.size()[2], sample_input.size()[3])]
         self.cell_initialized = True
 
@@ -78,27 +92,28 @@ class LSTM_conv_dw(nn.Module):
 
             while len(self.cell_state) > self.backprop_steps:
                 #delete history that are older than specified
+                #only keeping history up to backprop_steps
                 del self.cell_state[0]
                 del self.pre_output[0]
 
-            pre_output = self.pre_output[-1].detach() #to seperate the entire history from autograd
-            cell_state = self.cell_state[-1].detach()
+            pre_output = Variable(self.pre_output[-1].detach(), requires_grad=True) #to seperate the entire history from autograd
+            old_cell_state = Variable(self.cell_state[-1][1].detach(), requires_grad=True) #to seperate the entire history from autograd
 
             merged_inp = self.conv_bottleneck(torch.cat((input, pre_output),dim=1))
             
             #forgetting info from cell state based on new info
-            forget_filter = F.sigmoid(self.conv_forgetgate(merged_inp))
-            cell_state = torch.mul(cell_state, forget_filter)
+            forget_filter = F.sigmoid(self.conv_forgetgate(merged_inp)+self.forget_bias)
+            cell_state = torch.mul(old_cell_state, forget_filter)
 
             #adding new info to cell state
             input2cell = torch.mul(F.tanh(self.conv_input2cell(merged_inp)), F.sigmoid(self.conv_inputgate(merged_inp)))
             cell_state = cell_state + input2cell
 
             #using cell state to generate output
-            output = F.tanh(torch.mul(cell_state, self.conv_outputgate(merged_inp)))
+            output = torch.mul(F.tanh(cell_state), F.sigmoid(self.conv_outputgate(merged_inp)))
             pre_output = output
 
-            self.cell_state.append(cell_state)
+            self.cell_state.append([old_cell_state,cell_state])
             self.pre_output.append(pre_output)
 
             return output
@@ -107,6 +122,11 @@ class LSTM_conv_dw(nn.Module):
             output = self._conv_dw(x)
             self.pre_output = output
             return output
+
+    def TBPTT(self, step_back):
+        for i in range(len(self.cell_state)+step_back-2):
+            curr_grad = self.cell_state[-i-1][0].grad
+            self.cell_state[-i-2][1].backward(curr_grad, retain_graph=True)
 
 def conv_dw(inp, oup, stride=1, padding=0, expand_ratio=1):
 # based on the implementation in https://github.com/tensorflow/models/blob/master/research/object_detection/models/feature_map_generators.py#L213

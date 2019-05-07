@@ -105,13 +105,16 @@ def add_extras(base, feature_layer, mbox, num_classes, backprop_steps = 10):
     extra_layers = []
     loc_layers = []
     conf_layers = []
-    in_channels = None
+    try:
+        in_channels = base[-1].conv[-1].num_features
+    except:
+        in_channels = None
     for layer, depth, box in zip(feature_layer[0], feature_layer[1], mbox):
         if layer == 'S':
             extra_layers += [ _conv_dw(in_channels, depth, stride=2, padding=1, expand_ratio=1) ]
             in_channels = depth
         elif layer == 'L':
-            extra_layers += [ LSTM_conv_dw(in_channels, depth, conv_dw_stride=2, conv_dw_padding=1, conv_dw_expand_ratio=1, backprop_steps =10) ]
+            extra_layers += [ LSTM_conv_dw(in_channels, depth, conv_dw_stride=2, conv_dw_padding=1, conv_dw_expand_ratio=1, backprop_steps =backprop_steps) ]
             in_channels = depth
         elif layer == '':
             extra_layers += [ _conv_dw(in_channels, depth, stride=1, expand_ratio=1) ]

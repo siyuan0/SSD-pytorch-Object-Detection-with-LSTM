@@ -36,6 +36,16 @@ V2_CONV_DEFS = [
     InvertedResidual(stride=1, depth=320, num=1, t=6),
 ]
 
+def V2_CONV_DEFS_CUT(structure):
+    return [Conv(stride=2, depth=32),
+            InvertedResidual(stride=1, depth=16, num=structure[0], t=1),
+            InvertedResidual(stride=2, depth=24, num=structure[1], t=6),
+            InvertedResidual(stride=2, depth=32, num=structure[2], t=6),
+            InvertedResidual(stride=2, depth=64, num=structure[3], t=6),
+            InvertedResidual(stride=1, depth=96, num=structure[4], t=6),
+            InvertedResidual(stride=2, depth=160, num=structure[5], t=6),
+            InvertedResidual(stride=1, depth=320, num=structure[6], t=6),]
+
 class _conv_bn(nn.Module):
     def __init__(self, inp, oup, stride):
         super(_conv_bn, self).__init__()
@@ -127,3 +137,7 @@ mobilenet_v2 = wrapped_partial(mobilenet, conv_defs=V2_CONV_DEFS, depth_multipli
 mobilenet_v2_075 = wrapped_partial(mobilenet, conv_defs=V2_CONV_DEFS, depth_multiplier=0.75)
 mobilenet_v2_050 = wrapped_partial(mobilenet, conv_defs=V2_CONV_DEFS, depth_multiplier=0.50)
 mobilenet_v2_025 = wrapped_partial(mobilenet, conv_defs=V2_CONV_DEFS, depth_multiplier=0.25)
+
+def mobilenet_v2_cut(structure, depth_multiplier = 1.0):
+    model_cut = V2_CONV_DEFS_CUT(structure)
+    return wrapped_partial(mobilenet, conv_defs=model_cut, depth_multiplier=depth_multiplier)

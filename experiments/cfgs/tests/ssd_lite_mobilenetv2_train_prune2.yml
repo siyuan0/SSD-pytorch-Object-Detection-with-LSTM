@@ -3,21 +3,21 @@ MODEL:
   NETS: mobilenet_v2
   IMAGE_SIZE: [300, 300]
   NUM_CLASSES: 5
-  FEATURE_LAYER: [[13, 17, 'L', 'L', 'L', 'L'], [96, 320, 512, 256, 256, 128]]
+  FEATURE_LAYER: [[13, 17, 'S', 'S'], [96, 320, 512, 256]]
   STEPS: [[16, 16], [32, 32], [64, 64], [100, 100], [150, 150], [300, 300]]
   SIZES: [[45, 45], [90, 90], [135, 135], [180, 180], [225, 225], [270, 270], [315, 315]]
   ASPECT_RATIOS: [[1, 2, 3], [1, 2, 3], [1, 2, 3], [1, 2, 3], [1, 2], [1, 2]]
   RNN:
     IN_USE: True
-    USE_LSTM_AFTER_EPOCH: 0
+    USE_LSTM_AFTER_EPOCH: 1601
     BACKPROP_STEPS: 5
     FRAMES_IN_VIDEO: 50
-    BATCH_SIZE: 8
+    BATCH_SIZE: 32
 
 TRAIN:
   MAX_EPOCHS: 1601
   CHECKPOINTS_EPOCHS: 100
-  BATCH_SIZE: 8
+  BATCH_SIZE: 32
   TRAINABLE_SCOPE: 'base,norm,extras,loc,conf'
   RESUME_SCOPE: 'base,norm,extras,loc,conf'
   OPTIMIZER:
@@ -32,7 +32,6 @@ TRAIN:
 TEST:
   BATCH_SIZE: 1
   TEST_SCOPE: [285, 300]
-  VIDEO_BREAK: [51,94,130,248,347]
 
 MATCHER:
   MATCHED_THRESHOLD: 0.5
@@ -52,7 +51,7 @@ DATASET:
   PROB: 0.6
   SHUFFLE: True
 
-EXP_DIR: './experiments/models/ssd_mobilenet_v2_custom1_RNN'
-LOG_DIR: './experiments/models/ssd_mobilenet_v2_custom1_RNN'
-RESUME_CHECKPOINT: './weights/custom/mobilenet_v2_ssd_lite_custom1_RNN.pth'
+EXP_DIR: './experiments/models/ssd_mobilenet_v2_custom4'
+LOG_DIR: './experiments/models/ssd_mobilenet_v2_custom4'
+RESUME_CHECKPOINT: './weights/custom/mobilenet_v2_ssd_lite_custom4.pth'
 PHASE: ['test']

@@ -43,6 +43,12 @@ __C.MODEL = AttrDict()
 # Name of the base net used to extract the features
 __C.MODEL.NETS = 'vgg16'
 
+# Structure of the base net in terms of number of each layer
+__C.MODEL.BASE_STRUCTURE = [1,2,3,4,3,3,1]
+
+# The multiplier of num of channels for base net
+__C.MODEL.DEPTH_MULTIPLIER = 1.0
+
 # Name of the model used to detect boundingbox
 __C.MODEL.SSDS = 'ssd'
 
@@ -84,13 +90,18 @@ __C.MODEL.RNN.IN_USE = False
 __C.MODEL.RNN.USE_LSTM_AFTER_EPOCH = 0
 # timestep to indicate how far back autograd to track for backpropagation
 __C.MODEL.RNN.BACKPROP_STEPS = 10
-
+# number of frames in a video, ie. the training process will reset the LSTM after this number of iter
+__C.MODEL.RNN.FRAMES_IN_VIDEO = 100
+# a copy of __C.TRAIN.BATCH_SIZE put here for convenience
+__C.MODEL.RNN.BATCH_SIZE = 4
 # ---------------------------------------------------------------------------- #
 # Train options
 # ---------------------------------------------------------------------------- #
 __C.TRAIN = AttrDict()
+# Track mAP of model by testing it every epoch
+__C.TRAIN.TRACK_MAP = True
 # The number of checkpoints kept, older ones are deleted to save space
-__C.TRAIN.CHECKPOINTS_KEPT = 10
+__C.TRAIN.CHECKPOINTS_KEPT = 100
 __C.TRAIN.CHECKPOINTS_EPOCHS = 5
 # The number of max iters
 __C.TRAIN.MAX_EPOCHS = 300
@@ -138,6 +149,7 @@ __C.TRAIN.LR_SCHEDULER.MAX_EPOCHS = __C.TRAIN.MAX_EPOCHS - __C.TRAIN.LR_SCHEDULE
 __C.TEST = AttrDict()
 __C.TEST.BATCH_SIZE = __C.TRAIN.BATCH_SIZE
 __C.TEST.TEST_SCOPE = [0, 300]
+__C.TEST.VIDEO_BREAK = []
 
 
 # ---------------------------------------------------------------------------- #
@@ -193,7 +205,8 @@ __C.DATASET.TRAIN_BATCH_SIZE = __C.TRAIN.BATCH_SIZE
 __C.DATASET.TEST_BATCH_SIZE = __C.TEST.BATCH_SIZE
 # number of workers to extract datas
 __C.DATASET.NUM_WORKERS = 8
-
+# whether to shuffe the data during training
+__C.DATASET.SHUFFLE = True
 
 # ---------------------------------------------------------------------------- #
 # Export options

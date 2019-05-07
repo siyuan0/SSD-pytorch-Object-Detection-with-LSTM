@@ -2,8 +2,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 from torch.autograd import Variable
 from lib.utils.box_utils import match, log_sum_exp
+
 
 
 class MultiBoxLoss(nn.Module):
@@ -106,7 +108,7 @@ class MultiBoxLoss(nn.Module):
 
         # Sum of losses: L(x,c,l,g) = (Lconf(x, c) + αLloc(x,l,g)) / N
 
-        N = num_pos.data.sum()
+        N = num_pos.data.sum() + np.exp(-100)#avoid division by zero
         loss_l/=N
         loss_c/=N
         return loss_l,loss_c

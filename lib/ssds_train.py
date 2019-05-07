@@ -25,6 +25,7 @@ from lib.dataset.dataset_factory import load_data
 from lib.utils.config_parse import cfg
 from lib.utils.eval_utils import *
 from lib.utils.visualize_utils import *
+from lib.layers.modules.LSTM import reset_model_LSTM, trigger_TBPTT_model_LSTM
 
 class Solver(object):
     """
@@ -36,18 +37,22 @@ class Solver(object):
         # Build model
         print('===> Building model')
         self.model, self.priorbox = create_model(cfg.MODEL)
-        
+        print(self.model)
         self.priors = Variable(self.priorbox.forward(), volatile=True)
         self.detector = Detect(cfg.POST_PROCESS, self.priors)
 
         # Load data
         print('===> Loading data')
-        self.train_loader = load_data(cfg.DATASET, 'train') if 'train' in cfg.PHASE else None
+        self.train_loader = load_data(cfg.DATASET, 'train', cfg.MODEL.RNN) if 'train' in cfg.PHASE else None
+        self.train_loader_noLSTM = load_data(cfg.DATASET, 'train') if 'train' in cfg.PHASE else None
         self.eval_loader = load_data(cfg.DATASET, 'eval') if 'eval' in cfg.PHASE else None
-        self.test_loader = load_data(cfg.DATASET, 'test') if 'test' in cfg.PHASE else None
+        self.test_loader = load_data(cfg.DATASET, 'test') #if 'test' in cfg.PHASE else None
         self.visualize_loader = load_data(cfg.DATASET, 'visualize') if 'visualize' in cfg.PHASE else None
 
-        self.backprop_steps = cfg.MODEL.RNN.BACKPROP_STEPS if cfg.MODEL.RNN.IN_USE else False #for RNN use, to track how far back to backprop
+        self.RNN_in_use = cfg.MODEL.RNN.IN_USE
+        self.backprop_steps = cfg.MODEL.RNN.BACKPROP_STEPS if self.RNN_in_use else False #for RNN use, to track how far back to backprop
+        self.frames_in_video = cfg.MODEL.RNN.FRAMES_IN_VIDEO if self.RNN_in_use else False #for resetting the LSTM
+        self.test_video_break = cfg.TEST.VIDEO_BREAK
 
         # Utilize GPUs for computation
         self.use_gpu = torch.cuda.is_available()
@@ -245,15 +250,21 @@ class Solver(object):
             if epoch > warm_up:
                 self.exp_lr_scheduler.step(epoch-warm_up)
             if 'train' in cfg.PHASE:
+                self.model = reset_model_LSTM(self.model)
+                
                 if epoch < self.cfg.MODEL.RNN.USE_LSTM_AFTER_EPOCH:
-                    with modules.LSTM.no_LSTM(): # perform the first few epoch without any use of LSTM
-                        self.train_epoch(self.model, self.train_loader, self.optimizer, self.criterion, self.writer, epoch, self.use_gpu)
+                    with modules.LSTM.no_LSTM(): # train the first few epoch without any use of LSTM
+                        self.train_epoch(self.model, self.train_loader_noLSTM, self.optimizer, self.criterion, self.writer, epoch, self.use_gpu)
+                        if self.cfg.TRAIN.TRACK_MAP:
+                            self.test_epoch(self.model, self.test_loader, self.detector, self.output_dir, self.use_gpu, self.writer, epoch, printout=False)
                 else:
-                    self.train_epoch(self.model, self.train_loader, self.optimizer, self.criterion, self.writer, epoch, self.use_gpu)
+                    self.train_epoch(self.model, self.train_loader, self.optimizer, self.criterion, self.writer, epoch, self.use_gpu, use_RNN=self.RNN_in_use)
+                    if self.cfg.TRAIN.TRACK_MAP:
+                        self.test_epoch(self.model, self.test_loader, self.detector, self.output_dir, self.use_gpu, self.writer, epoch, printout=False)
             if 'eval' in cfg.PHASE:
                 self.eval_epoch(self.model, self.eval_loader, self.detector, self.criterion, self.writer, epoch, self.use_gpu)
             if 'test' in cfg.PHASE:
-                self.test_epoch(self.model, self.test_loader, self.detector, self.output_dir, self.use_gpu)
+                self.test_epoch(self.model, self.test_loader, self.detector, self.output_dir, self.use_gpu, self.writer)
             if 'visualize' in cfg.PHASE:
                 self.visualize_epoch(self.model, self.visualize_loader, self.priorbox, self.writer, epoch,  self.use_gpu)
 
@@ -284,7 +295,7 @@ class Solver(object):
                 self.visualize_epoch(self.model, self.visualize_loader, self.priorbox, self.writer, 0,  self.use_gpu)
 
 
-    def train_epoch(self, model, data_loader, optimizer, criterion, writer, epoch, use_gpu):
+    def train_epoch(self, model, data_loader, optimizer, criterion, writer, epoch, use_gpu, use_RNN=False):
         model.train()
         print('dataset size: %d' %len(data_loader.dataset))
         epoch_size = len(data_loader)
@@ -292,12 +303,17 @@ class Solver(object):
 
         loc_loss = 0
         conf_loss = 0
+        out_history = []
         _t = Timer()
+        RNN_timesteps = 0
 
         for iteration in iter(range((epoch_size))):
             
+            try:
+                images, targets = next(batch_iterator)
+            except StopIteration:
+                break
 
-            images, targets = next(batch_iterator)
             if use_gpu:
                 images = Variable(images.cuda())
                 targets = [Variable(anno.cuda(), volatile=True) for anno in targets]
@@ -308,21 +324,47 @@ class Solver(object):
             # forward
             
             out = model(images, phase='train')
-            
-            # backprop
-            optimizer.zero_grad()
             loss_l, loss_c = criterion(out, targets)
-
-            # some bugs in coco train2017. maybe the annonation bug.
-            if loss_l.item() == float("Inf"):
-                continue
-
             loss = loss_l + loss_c
-            if self.backprop_steps: 
-                loss.backward(retain_graph = True)
+
+            if use_RNN: 
+                # out_history.append([out, targets])
+                RNN_timesteps += 1
+                next_video = ((iteration+1)%self.frames_in_video == 0) #check if gonna start next videoset for training
+                if RNN_timesteps == self.backprop_steps or iteration == epoch_size or next_video:
+                    #only optimize after a number of timesteps
+                    optimizer.zero_grad()
+                    loss.backward(retain_graph = True)
+                    # for idx in range(len(out_history)-1):
+                        # out_record, targets_record = out_history[-idx-1]
+                        # loss_l, loss_c = criterion(out_record, targets_record)
+                        # loss = loss_l + loss_c
+                        # loss.backward(retain_graph = True) #accumulating all the grads across the timesteps
+                    trigger_TBPTT_model_LSTM(model, 0)
+                    # loss.backward(retain_graph=True)
+                    # trigger_TBPTT_model_LSTM(model, -1)
+                    optimizer.step()
+                    RNN_timesteps = 0
+                    # out_history = []
+                # optimizer.zero_grad()
+                # loss.backward(retain_graph=True)
+                # trigger_TBPTT_model_LSTM(model,-1)
+                # optimizer.step()
+                if next_video:
+                    #resets the model's LSTM so that next batch can be treated as a new set of videos
+                    with torch.no_grad():
+                        reset_model_LSTM(model)
             else:
+                loss_l, loss_c = criterion(out, targets)
+                # some bugs in coco train2017. maybe the annonation bug.
+                if loss_l.item() == float("Inf"):
+                    continue
+                # loss = loss_l + loss_c
+                optimizer.zero_grad()
+                loss = loss_l + loss_c #putting more pressure on the location loss, cos loss_c converges too fast and tend to explode
                 loss.backward()
-            optimizer.step()
+                optimizer.step()
+                
 
             time = _t.toc()
             loc_loss += loss_l.item()
@@ -487,7 +529,7 @@ class Solver(object):
     #     data_loader.dataset.evaluate_detections(all_boxes, output_dir)
 
 
-    def test_epoch(self, model, data_loader, detector, output_dir, use_gpu):
+    def test_epoch(self, model, data_loader, detector, output_dir, use_gpu, writer=None, epoch=None, printout=True):
         model.eval()
 
         dataset = data_loader.dataset
@@ -498,6 +540,7 @@ class Solver(object):
 
         _t = Timer()
         fps_list = [] #to track fps for calculation of average fps
+        mAP_list = [] #to track mAP for each image
         for i in iter(range((num_images))):
             img = dataset.pull_image(i)
             scale = [img.shape[1], img.shape[0], img.shape[1], img.shape[0]]
@@ -505,6 +548,12 @@ class Solver(object):
                 images = Variable(dataset.preproc(img)[0].unsqueeze(0).cuda(), volatile=True)
             else:
                 images = Variable(dataset.preproc(img)[0].unsqueeze(0), volatile=True)
+
+            #resets the LSTM at specified points to treat next frame as new video
+            if self.test_video_break:
+                if i in self.test_video_break:
+                    print("video break")
+                    reset_model_LSTM(model)
 
             _t.tic()
             # forward
@@ -515,6 +564,7 @@ class Solver(object):
 
             time = _t.toc()
 
+            intermittent_box = [[[]] for _ in range(num_classes)] #for intermittent measuring of mAP
             # TODO: make it smart:
             for j in range(1, num_classes):
                 cls_dets = list()
@@ -528,12 +578,24 @@ class Solver(object):
                 if len(cls_dets) == 0:
                     cls_dets = empty_array
                 all_boxes[j][i] = np.array(cls_dets)
-
-            # log per iter
-            log = '\r==>Test: || {iters:d}/{epoch_size:d} in {time:.3f}s [{prograss}]\r'.format(
+                intermittent_box[j] = np.array(cls_dets) #for intermittent measuring of mAP
+                
+            fps_list.append(1/time)
+            # if self.cfg.DATASET.DATASET == 'customRNN':
+            #     #intermittent evaluation of mAP. 
+            #     #There still seems to be some difference between this and evaluating at the end
+            #     APs, mAP = data_loader.dataset.evaluate_intermittent_detections(intermittent_box, img_id=i, output_dir=output_dir)
+            #     mAP_list.append(mAP)
+            #     writer.add_scalar('mAP/image_num', mAP, i)
+            # # log per iter
+            #     log = '\r==>Test: || {iters:d}/{epoch_size:d} in {time:.3f}s [{prograss}] mAP:{mAP:.3f}\r'.format(
+            #             prograss='#'*int(round(10*i/num_images)) + '-'*int(round(10*(1-i/num_images))), iters=i, epoch_size=num_images,
+            #             time=time, mAP=mAP)
+            # else:
+            log = '\r==>Test: || {iters:d}/{epoch_size:d} in {time:.3f}s [{prograss}]'.format(
                     prograss='#'*int(round(10*i/num_images)) + '-'*int(round(10*(1-i/num_images))), iters=i, epoch_size=num_images,
                     time=time)
-            fps_list.append(1/time)            
+             
             sys.stdout.write(log)
             sys.stdout.flush()
         print('Average fps: {fps:.3f}'.format(fps=np.mean(np.array(fps_list)))) #print the average fps for this epoch
@@ -543,8 +605,10 @@ class Solver(object):
 
         # currently the COCO dataset do not return the mean ap or ap 0.5:0.95 values
         print('Evaluating detections')
-        data_loader.dataset.evaluate_detections(all_boxes, output_dir)
-
+        _, mAP = data_loader.dataset.evaluate_detections(all_boxes, output_dir)
+        if epoch is not None:
+            print('mAP: {mAP:.3f}'.format(mAP=mAP))
+            writer.add_scalar('Train/test_mAP', mAP, epoch)
 
     def visualize_epoch(self, model, data_loader, priorbox, writer, epoch, use_gpu):
         model.eval()

@@ -41,6 +41,7 @@ networks_map = {
                     'mobilenet_v2_075': mobilenet.mobilenet_v2_075,
                     'mobilenet_v2_050': mobilenet.mobilenet_v2_050,
                     'mobilenet_v2_025': mobilenet.mobilenet_v2_025,
+                    'mobilenet_v2_cut': mobilenet.mobilenet_v2_cut,
                     'darknet_19': darknet.darknet_19,
                     'darknet_53': darknet.darknet_53,
                }
@@ -63,7 +64,10 @@ def create_model(cfg):
     '''
     '''
     #
-    base = networks_map[cfg.NETS]
+    if cfg.NETS == 'mobilenet_v2_cut':
+        base = networks_map[cfg.NETS](cfg.BASE_STRUCTURE, cfg.DEPTH_MULTIPLIER)
+    else:
+        base = networks_map[cfg.NETS]
     number_box= [2*len(aspect_ratios) if isinstance(aspect_ratios[0], int) else len(aspect_ratios) for aspect_ratios in cfg.ASPECT_RATIOS]  
     if cfg.RNN.IN_USE:
         model = ssds_map[cfg.SSDS](base=base, feature_layer=cfg.FEATURE_LAYER, mbox=number_box, num_classes=cfg.NUM_CLASSES, backprop_steps=cfg.RNN.BACKPROP_STEPS)

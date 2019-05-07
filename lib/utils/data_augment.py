@@ -186,6 +186,13 @@ def preproc_for_test(image, insize, mean):
     image -= mean
     return image.transpose(2, 0, 1)
 
+def preproc_for_test_RNN(image, insize, mean):
+    image = cv2.resize(image, (insize[0], insize[1]),interpolation=cv2.INTER_LINEAR)
+    image = image.astype(np.float32)
+    image -= mean
+    return image.transpose(2, 0, 1)
+
+
 def draw_bbox(image, bbxs, color=(0, 255, 0)):
     img = image.copy()
     bbxs = np.array(bbxs).astype(np.int32)
@@ -195,12 +202,13 @@ def draw_bbox(image, bbxs, color=(0, 255, 0)):
 
 class preproc(object):
 
-    def __init__(self, resize, rgb_means, p, writer=None):
+    def __init__(self, resize, rgb_means, p, writer=None, useRNN=False):
         self.means = rgb_means
         self.resize = resize
         self.p = p
         self.writer = writer # writer used for tensorboard visualization
         self.epoch = 0
+        self.useRNN = useRNN
 
     def __call__(self, image, targets=None):
         # some bugs 
@@ -208,14 +216,14 @@ class preproc(object):
             targets = np.zeros((1,5))
             targets[0] = image.shape[0]
             targets[0] = image.shape[1]
-            image = preproc_for_test(image, self.resize, self.means)
+            image = preproc_for_test_RNN(image, self.resize, self.means) if self.useRNN else preproc_for_test(image, self.resize, self.means)
             return torch.from_numpy(image), targets
 
         boxes = targets[:,:-1].copy()
         labels = targets[:,-1].copy()
         if len(boxes) == 0:
             targets = np.zeros((1,5))
-            image = preproc_for_test(image, self.resize, self.means) # some ground truth in coco do not have bounding box! weird!
+            image = preproc_for_test_RNN(image, self.resize, self.means) if self.useRNN else preproc_for_test(image, self.resize, self.means) # some ground truth in coco do not have bounding box! weird!
             return torch.from_numpy(image), targets
         if self.p == -1: # eval
             height, width, _ = image.shape
@@ -223,7 +231,7 @@ class preproc(object):
             boxes[:, 1::2] /= height
             labels = np.expand_dims(labels,1)
             targets = np.hstack((boxes,labels))
-            image = preproc_for_test(image, self.resize, self.means)
+            image = preproc_for_test_RNN(image, self.resize, self.means) if self.useRNN else preproc_for_test(image, self.resize, self.means)
             return torch.from_numpy(image), targets
 
         image_o = image.copy()
@@ -239,13 +247,13 @@ class preproc(object):
         if self.writer is not None:
             image_show = draw_bbox(image, boxes)
             self.writer.add_image('preprocess/input_image', image_show, self.epoch)
-
-        image_t, boxes, labels = _crop(image, boxes, labels)
+        image_t = image
+        if not self.useRNN: image_t, boxes, labels = _crop(image_t, boxes, labels)
         if self.writer is not None:
             image_show = draw_bbox(image_t, boxes)
             self.writer.add_image('preprocess/crop_image', image_show, self.epoch)
 
-        image_t = _distort(image_t)
+        if not self.useRNN: image_t = _distort(image_t)
         if self.writer is not None:
             image_show = draw_bbox(image_t, boxes)
             self.writer.add_image('preprocess/distort_image', image_show, self.epoch)
@@ -254,13 +262,12 @@ class preproc(object):
         # if self.writer is not None:
         #     image_show = draw_bbox(image_t, boxes)
         #     self.writer.add_image('preprocess/elastic_image', image_show, self.epoch)
-
-        image_t, boxes = _expand(image_t, boxes, self.means, self.p)
+        if not self.useRNN: image_t, boxes = _expand(image_t, boxes, self.means, self.p)
         if self.writer is not None:
             image_show = draw_bbox(image_t, boxes)
             self.writer.add_image('preprocess/expand_image', image_show, self.epoch)
 
-        image_t, boxes = _mirror(image_t, boxes)
+        if not self.useRNN: image_t, boxes = _mirror(image_t, boxes)
         if self.writer is not None:
             image_show = draw_bbox(image_t, boxes)
             self.writer.add_image('preprocess/mirror_image', image_show, self.epoch)
@@ -271,7 +278,10 @@ class preproc(object):
             self.release_writer()
 
         height, width, _ = image_t.shape
-        image_t = preproc_for_test(image_t, self.resize, self.means)
+        if self.useRNN:
+            image_t = preproc_for_test_RNN(image_t, self.resize, self.means)
+        else:
+            image_t = preproc_for_test(image_t, self.resize, self.means)    
         boxes = boxes.copy()
         boxes[:, 0::2] /= width
         boxes[:, 1::2] /= height
