@@ -16,19 +16,19 @@ if sys.version_info[0] == 2:
 else:
     import xml.etree.ElementTree as ET
 
-# UV dataset classes
-CUSTOM_CLASSES = ( '__background__', # always index 0
-    'person', 'car', 'bike', 'obstacle')
-# # Imagenet vid 2015 classes
-# CUSTOM_CLASSES = ('__background__',  # always index 0
-#         'n02691156', 'n02419796', 'n02131653', 'n02834778',
-#         'n01503061', 'n02924116', 'n02958343', 'n02402425',
-#         'n02084071', 'n02121808', 'n02503517', 'n02118333',
-#         'n02510455', 'n02342885', 'n02374451', 'n02129165',
-#         'n01674464', 'n02484322', 'n03790512', 'n02324045',
-#         'n02509815', 'n02411705', 'n01726692', 'n02355227',
-#         'n02129604', 'n04468005', 'n01662784', 'n04530566',
-#         'n02062744', 'n02391049')
+## UV dataset classes
+# CUSTOM_CLASSES = ( '__background__', # always index 0
+#     'person', 'car', 'bike', 'obstacle')
+# Imagenet vid 2015 classes
+CUSTOM_CLASSES = ('__background__',  # always index 0
+        'n02691156', 'n02419796', 'n02131653', 'n02834778',
+        'n01503061', 'n02924116', 'n02958343', 'n02402425',
+        'n02084071', 'n02121808', 'n02503517', 'n02118333',
+        'n02510455', 'n02342885', 'n02374451', 'n02129165',
+        'n01674464', 'n02484322', 'n03790512', 'n02324045',
+        'n02509815', 'n02411705', 'n01726692', 'n02355227',
+        'n02129604', 'n04468005', 'n01662784', 'n04530566',
+        'n02062744', 'n02391049')
 
 # for making bounding boxes pretty
 COLORS = ((255, 0, 0, 128), (0, 255, 0, 128), (0, 0, 255, 128),
@@ -171,11 +171,15 @@ class CUSTOMRNNDetection(data.Dataset):
         self._annopath = os.path.join('%s', 'Annotations', '%s.xml')
         self._imgpath = os.path.join('%s', 'JPEGImages', '%s.jpg')
         self.ids = list()
-        
+        self.test_video_break = []
+
         for (year, name) in image_sets:
             self._year = year
             rootpath = os.path.join(self.root, 'VOC' + year)
-            for line in open(os.path.join(rootpath, 'ImageSets', 'Main', name + '.txt')):
+            for idx, line in enumerate(open(os.path.join(rootpath, 'ImageSets', 'Main', name + '.txt'))):
+                if name == 'test':
+                    if line.strip().rsplit('-')[1] == '000':
+                        self.test_video_break.append(idx) #for storing of where videos start and end in test phase
                 self.ids.append((rootpath, line.strip()))
         self.ids.sort(key=takeSecond)
         self.augment_data = None

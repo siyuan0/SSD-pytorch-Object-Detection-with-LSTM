@@ -8,3 +8,5 @@ __pycache__
 *.pyc
 log*
 *results.txt
+tracking/
+*.zip

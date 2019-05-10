@@ -2,12 +2,14 @@ from lib.dataset import voc
 from lib.dataset import coco
 from lib.dataset import custom
 from lib.dataset import customRNN
+from lib.dataset import Imagenet_vid_2015
 
 dataset_map = {
                 'voc': voc.VOCDetection,
                 'coco': coco.COCODetection,
                 'custom': custom.CUSTOMDetection,
                 'customRNN': customRNN.CUSTOMRNNDetection,
+                'imagenet': Imagenet_vid_2015.CUSTOMRNNDetection,
             }
 
 def gen_dataset_fn(name):

@@ -91,6 +91,7 @@ class MultiBoxLoss(nn.Module):
 
         # Hard Negative Mining
         loss_c = loss_c.view(pos.size()[0],pos.size()[1]) #added to fix misaligned shape
+        
         loss_c[pos] = 0 # filter out pos boxes for now
         loss_c = loss_c.view(num, -1)
         _,loss_idx = loss_c.sort(1, descending=True)

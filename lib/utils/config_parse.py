@@ -100,6 +100,8 @@ __C.MODEL.RNN.BATCH_SIZE = 4
 __C.TRAIN = AttrDict()
 # Track mAP of model by testing it every epoch
 __C.TRAIN.TRACK_MAP = True
+# How often the model is tested during training
+__C.TRAIN.TRACK_MAP_EVERY = 1
 # The number of checkpoints kept, older ones are deleted to save space
 __C.TRAIN.CHECKPOINTS_KEPT = 100
 __C.TRAIN.CHECKPOINTS_EPOCHS = 5

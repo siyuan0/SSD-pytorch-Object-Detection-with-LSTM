@@ -175,6 +175,7 @@ class VOCDetection(data.Dataset):
             target = self.target_transform(target)
 
 
+
         if self.preproc is not None:
             img, target = self.preproc(img, target)
             #print(img.size())
