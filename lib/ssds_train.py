@@ -220,7 +220,7 @@ class Solver(object):
                             self.test_epoch(self.model, self.test_loader, self.detector, self.output_dir, self.use_gpu, self.writer, epoch, printout=False)
                 else:
                     self.train_epoch(self.model, self.train_loader, self.optimizer, self.criterion, self.writer, epoch, self.use_gpu, use_RNN=self.RNN_in_use)
-                    if self.cfg.TRAIN.TRACK_MAP:
+                    if self.cfg.TRAIN.TRACK_MAP and epoch%self.cfg.TRAIN.TRACK_MAP_EVERY==0 and epoch!=1:
                         self.test_epoch(self.model, self.test_loader, self.detector, self.output_dir, self.use_gpu, self.writer, epoch, printout=False)
             if 'eval' in cfg.PHASE:
                 self.eval_epoch(self.model, self.eval_loader, self.detector, self.criterion, self.writer, epoch, self.use_gpu)
