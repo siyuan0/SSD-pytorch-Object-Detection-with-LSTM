@@ -127,12 +127,12 @@ def _expand(image, boxes, scale_list=1, ratio_rand_list=0, left_scale_list=0, to
         left = int(left_scale*(w - width))
         top = int(top_scale*(h - height))
 
-        #test__
-        w = 400
-        h = 400
-        left = 50
-        top = 50
-        #___
+        # #test__
+        # w = 400
+        # h = 400
+        # left = 50
+        # top = 50
+        # #___
 
         boxes_t = boxes.copy()
 

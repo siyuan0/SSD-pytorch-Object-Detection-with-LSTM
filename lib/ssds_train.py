@@ -43,7 +43,7 @@ class Solver(object):
 
         # Load data
         print('===> Loading data')
-        self.train_loader = load_data(cfg.DATASET, 'train', cfg.MODEL.RNN) if 'train' in cfg.PHASE else None
+        self.train_loader = load_data(cfg.DATASET, 'train', cfg.MODEL.RNN) if 'train' in cfg.PHASE and cfg.MODEL.RNN.IN_USE else None
         self.train_loader_noLSTM = load_data(cfg.DATASET, 'train') if 'train' in cfg.PHASE else None
         self.eval_loader = load_data(cfg.DATASET, 'eval') if 'eval' in cfg.PHASE else None
         self.test_loader = load_data(cfg.DATASET, 'test') #if 'test' in cfg.PHASE else None
@@ -52,7 +52,11 @@ class Solver(object):
         self.RNN_in_use = cfg.MODEL.RNN.IN_USE
         self.backprop_steps = cfg.MODEL.RNN.BACKPROP_STEPS if self.RNN_in_use else False #for RNN use, to track how far back to backprop
         self.frames_in_video = cfg.MODEL.RNN.FRAMES_IN_VIDEO if self.RNN_in_use else False #for resetting the LSTM
-        self.test_video_break = cfg.TEST.VIDEO_BREAK
+        if cfg.TEST.VIDEO_BREAK == ['from_dataset']:
+            self.test_video_break = self.test_loader.dataset.test_video_break
+        else:
+            self.test_video_break = cfg.TEST.VIDEO_BREAK
+
 
         # Utilize GPUs for computation
         self.use_gpu = torch.cuda.is_available()
@@ -60,29 +64,10 @@ class Solver(object):
             print('Utilize GPUs for computation')
             for GPU_ID in range(torch.cuda.device_count()):
                 print('Using GPU: %s' %(torch.cuda.get_device_name(GPU_ID)))
-            # print('Number of GPU available', torch.cuda.device_count())
             self.model.cuda()
             self.priors.cuda()
             cudnn.benchmark = True
-            # if torch.cuda.device_count() > 1: # comment off this part if it doesn't work
-            #     self.para_model = torch.nn.DataParallel(self.model)
-            #     self.model = self.para_model
-            #     # print(self.trainable_param(cfg.TRAIN.TRAINABLE_SCOPE))
-            #     # quit()
-            #     print(vars(self.model))
-            #     # print(vars(self.model.module))
-            #     # for param in self.model.parameters():
-            #     #     print('dataparallel: '+ str(param.size()))
-            #     # for param in self.model.module.parameters():
-            #     #     print('non-dataparallel: '+ str(param.size()))
-            #     quit()
-
-        # # Print the model architecture and parameters
-        # print('Model architectures:\n{}\n'.format(self.model))
-
-        # print('Parameters and size:')
-        # for name, param in self.model.named_parameters():
-        #     print('{}: {}'.format(name, list(param.size())))
+           
 
         # print trainable scope
         print('Trainable scope: {}'.format(cfg.TRAIN.TRAINABLE_SCOPE))
@@ -131,28 +116,6 @@ class Solver(object):
             pretrained_dict = {'.'.join(k.split('.')[1:]): v for k, v in list(checkpoint.items())}
             checkpoint = pretrained_dict
 
-        # change the name of the weights which exists in other model
-        # change_dict = {
-        #         'conv1.weight':'base.0.weight',
-        #         'bn1.running_mean':'base.1.running_mean',
-        #         'bn1.running_var':'base.1.running_var',
-        #         'bn1.bias':'base.1.bias',
-        #         'bn1.weight':'base.1.weight',
-        #         }
-        # for k, v in list(checkpoint.items()):
-        #     for _k, _v in list(change_dict.items()):
-        #         if _k == k:
-        #             new_key = k.replace(_k, _v)
-        #             checkpoint[new_key] = checkpoint.pop(k)
-        # change_dict = {'layer1.{:d}.'.format(i):'base.{:d}.'.format(i+4) for i in range(20)}
-        # change_dict.update({'layer2.{:d}.'.format(i):'base.{:d}.'.format(i+7) for i in range(20)})
-        # change_dict.update({'layer3.{:d}.'.format(i):'base.{:d}.'.format(i+11) for i in range(30)})
-        # for k, v in list(checkpoint.items()):
-        #     for _k, _v in list(change_dict.items()):
-        #         if _k in k:
-        #             new_key = k.replace(_k, _v)
-        #             checkpoint[new_key] = checkpoint.pop(k)
-
         resume_scope = self.cfg.TRAIN.RESUME_SCOPE
         # extract the weights based on the resume scope
         if resume_scope != '':
@@ -165,8 +128,6 @@ class Solver(object):
             checkpoint = pretrained_dict
 
         pretrained_dict = {k: v for k, v in checkpoint.items() if k in self.model.state_dict()}
-        # print("=> Resume weigths:")
-        # print([k for k, v in list(pretrained_dict.items())])
 
         checkpoint = self.model.state_dict()
 
@@ -251,11 +212,11 @@ class Solver(object):
                 self.exp_lr_scheduler.step(epoch-warm_up)
             if 'train' in cfg.PHASE:
                 self.model = reset_model_LSTM(self.model)
-                
-                if epoch < self.cfg.MODEL.RNN.USE_LSTM_AFTER_EPOCH:
+
+                if epoch < self.cfg.MODEL.RNN.USE_LSTM_AFTER_EPOCH or not self.cfg.MODEL.RNN.IN_USE:
                     with modules.LSTM.no_LSTM(): # train the first few epoch without any use of LSTM
                         self.train_epoch(self.model, self.train_loader_noLSTM, self.optimizer, self.criterion, self.writer, epoch, self.use_gpu)
-                        if self.cfg.TRAIN.TRACK_MAP:
+                        if self.cfg.TRAIN.TRACK_MAP and epoch%self.cfg.TRAIN.TRACK_MAP_EVERY==0 and epoch!=1:
                             self.test_epoch(self.model, self.test_loader, self.detector, self.output_dir, self.use_gpu, self.writer, epoch, printout=False)
                 else:
                     self.train_epoch(self.model, self.train_loader, self.optimizer, self.criterion, self.writer, epoch, self.use_gpu, use_RNN=self.RNN_in_use)
@@ -335,14 +296,7 @@ class Solver(object):
                     #only optimize after a number of timesteps
                     optimizer.zero_grad()
                     loss.backward(retain_graph = True)
-                    # for idx in range(len(out_history)-1):
-                        # out_record, targets_record = out_history[-idx-1]
-                        # loss_l, loss_c = criterion(out_record, targets_record)
-                        # loss = loss_l + loss_c
-                        # loss.backward(retain_graph = True) #accumulating all the grads across the timesteps
-                    trigger_TBPTT_model_LSTM(model, 0)
-                    # loss.backward(retain_graph=True)
-                    # trigger_TBPTT_model_LSTM(model, -1)
+                    trigger_TBPTT_model_LSTM(model, 0) #calls backprop for the past cell states
                     optimizer.step()
                     RNN_timesteps = 0
                     # out_history = []
@@ -465,69 +419,6 @@ class Solver(object):
         viz_pr_curve(writer, prec, rec, epoch)
         viz_archor_strategy(writer, size, gt_label, epoch)
 
-    # TODO: HOW TO MAKE THE DATALOADER WITHOUT SHUFFLE
-    # def test_epoch(self, model, data_loader, detector, output_dir, use_gpu):
-    #     # sys.stdout.write('\r===> Eval mode\n')
-
-    #     model.eval()
-
-    #     num_images = len(data_loader.dataset)
-    #     num_classes = detector.num_classes
-    #     batch_size = data_loader.batch_size
-    #     all_boxes = [[[] for _ in range(num_images)] for _ in range(num_classes)]
-    #     empty_array = np.transpose(np.array([[],[],[],[],[]]),(1,0))
-
-    #     epoch_size = len(data_loader)
-    #     batch_iterator = iter(data_loader)
-
-    #     _t = Timer()
-
-    #     for iteration in iter(range((epoch_size))):
-    #         images, targets = next(batch_iterator)
-    #         targets = [[anno[0][1], anno[0][0], anno[0][1], anno[0][0]] for anno in targets] # contains the image size
-    #         if use_gpu:
-    #             images = Variable(images.cuda())
-    #         else:
-    #             images = Variable(images)
-
-    #         _t.tic()
-    #         # forward
-    #         out = model(images, is_train=False)
-
-    #         # detect
-    #         detections = detector.forward(out)
-
-    #         time = _t.toc()
-
-    #         # TODO: make it smart:
-    #         for i, (dets, scale) in enumerate(zip(detections, targets)):
-    #             for j in range(1, num_classes):
-    #                 cls_dets = list()
-    #                 for det in dets[j]:
-    #                     if det[0] > 0:
-    #                         d = det.cpu().numpy()
-    #                         score, box = d[0], d[1:]
-    #                         box *= scale
-    #                         box = np.append(box, score)
-    #                         cls_dets.append(box)
-    #                 if len(cls_dets) == 0:
-    #                     cls_dets = empty_array
-    #                 all_boxes[j][iteration*batch_size+i] = np.array(cls_dets)
-
-    #         # log per iter
-    #         log = '\r==>Test: || {iters:d}/{epoch_size:d} in {time:.3f}s [{prograss}]\r'.format(
-    #                 prograss='#'*int(round(10*iteration/epoch_size)) + '-'*int(round(10*(1-iteration/epoch_size))), iters=iteration, epoch_size=epoch_size,
-    #                 time=time)
-    #         sys.stdout.write(log)
-    #         sys.stdout.flush()
-
-    #     # write result to pkl
-    #     with open(os.path.join(output_dir, 'detections.pkl'), 'wb') as f:
-    #         pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
-
-    #     print('Evaluating detections')
-    #     data_loader.dataset.evaluate_detections(all_boxes, output_dir)
-
 
     def test_epoch(self, model, data_loader, detector, output_dir, use_gpu, writer=None, epoch=None, printout=True):
         model.eval()
@@ -552,7 +443,7 @@ class Solver(object):
             #resets the LSTM at specified points to treat next frame as new video
             if self.test_video_break:
                 if i in self.test_video_break:
-                    print("video break")
+                    # print("video break")
                     reset_model_LSTM(model)
 
             _t.tic()

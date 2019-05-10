@@ -9,3 +9,4 @@ __pycache__
 log*
 *results.txt
 tracking/
+*.zip

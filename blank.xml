@@ -1,0 +1,11 @@
+<annotation>
+	<folder></folder>
+	<filename></filename>
+	<source>
+		<database>ILSVRC_2015</database>
+	</source>
+	<size>
+		<width>1280</width>
+		<height>720</height>
+	</size>
+</annotation>
