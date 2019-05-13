@@ -26,6 +26,7 @@ from lib.utils.config_parse import cfg
 from lib.utils.eval_utils import *
 from lib.utils.visualize_utils import *
 from lib.layers.modules.LSTM import reset_model_LSTM, trigger_TBPTT_model_LSTM
+from prune import *
 
 class Solver(object):
     """
@@ -423,6 +424,8 @@ class Solver(object):
     def test_epoch(self, model, data_loader, detector, output_dir, use_gpu, writer=None, epoch=None, printout=True):
         model.eval()
 
+        model = prune_model(model)
+
         dataset = data_loader.dataset
         num_images = len(dataset)
         num_classes = detector.num_classes
@@ -430,6 +433,8 @@ class Solver(object):
         empty_array = np.transpose(np.array([[],[],[],[],[]]),(1,0))
 
         _t = Timer()
+        # _t_modelonly = Timer()
+        # fps_modelonly = []
         fps_list = [] #to track fps for calculation of average fps
         mAP_list = [] #to track mAP for each image
         for i in iter(range((num_images))):
@@ -447,9 +452,10 @@ class Solver(object):
                     reset_model_LSTM(model)
 
             _t.tic()
+            # _t_modelonly.tic()
             # forward
             out = model(images, phase='eval')
-
+            # time_modelonly = _t_modelonly.toc()
             # detect
             detections = detector.forward(out)
 
@@ -472,6 +478,7 @@ class Solver(object):
                 intermittent_box[j] = np.array(cls_dets) #for intermittent measuring of mAP
                 
             fps_list.append(1/time)
+            # fps_modelonly.append(1/time_modelonly)
             # if self.cfg.DATASET.DATASET == 'customRNN':
             #     #intermittent evaluation of mAP. 
             #     #There still seems to be some difference between this and evaluating at the end
@@ -490,6 +497,8 @@ class Solver(object):
             sys.stdout.write(log)
             sys.stdout.flush()
         print('Average fps: {fps:.3f}'.format(fps=np.mean(np.array(fps_list)))) #print the average fps for this epoch
+        # print('Average modelonly fps: {fps:.3f}'.format(fps=np.mean(np.array(fps_modelonly)))) #print the average fps for this epoch
+        
         # write result to pkl
         with open(os.path.join(output_dir, 'detections.pkl'), 'wb') as f:
             pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
