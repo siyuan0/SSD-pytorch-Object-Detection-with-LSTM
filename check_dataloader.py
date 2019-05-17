@@ -82,8 +82,12 @@ def get_data():
 			target = targets[i].numpy()
 			
 			video_list[i].append((img, target))
-	print('printing images')
-	print(images.size())
+	print('printing images to /home/chensy/pythonML/LSTM-SSD-pytorch/trainimages/')
+	# print(images.size())
+	try:
+		os.mkdir('/home/chensy/pythonML/LSTM-SSD-pytorch/trainimages')
+	except:
+		pass
 	for i in range(images.size()[0]):
 		# video_writer = cv2.VideoWriter('output_video{d}.avi'.format(d=i)
 		# 										,cv2.VideoWriter_fourcc(*'XVID'),12, 

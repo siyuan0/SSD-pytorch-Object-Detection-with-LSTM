@@ -6,6 +6,7 @@ from torch.autograd import Variable
 import os
 
 from lib.layers import *
+from prune import debug_mode
 
 class SSDLite_RNN(nn.Module):
     """Single Shot Multibox Architecture for embeded system
@@ -60,7 +61,6 @@ class SSDLite_RNN(nn.Module):
         sources = list()
         loc = list()
         conf = list()
-
         # apply bases layers and cache source layer outputs
         for k in range(len(self.base)):
             x = self.base[k](x)
@@ -75,8 +75,7 @@ class SSDLite_RNN(nn.Module):
         for k, v in enumerate(self.extras):
             x = F.relu(v(x), inplace=False)
             sources.append(x)
-            # if k % 2 == 1:
-            #     sources.append(x)
+
 
         if phase == 'feature':
             return sources

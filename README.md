@@ -11,12 +11,15 @@ In addition, various core files were modified to accomodate the inclusion of the
   
 *This repo works best on a linux environment. Windows users may encounter various bugs.  
 
+## Docker
+Run the docker image by `sh nsh run $(id -u)`. This will activate the docker in the current working directory, under your current user account. In this mode, you will not be able to install new packages, due to the permissions restriction of your current user account. If you wish to install new packages, exit this mode using `exit` and then run the docker image in root account using `sh nsh run root`. In root account, you can install new packages, however, any files you modify would be write-protected under root account. Hence, you may not be able to modify them outside of the docker root account. Once finished installing packages, exit the root acount and run `sh nsh commit` to save the changes you made to the docker environment.
+
 ## Installation
 1. Install [pytorch](http://pytorch.org/)
 2. Install requirements by `pip install -r ./requirements.txt` (if this doesn't work, just install the packages in the text file one by one)
 
 ## Train/Test
-To test, run the command `python train.py --cfg=[PATH OF CONFIG FILE]`. For example, testing the baseline SSD Mobilenetv2 is done via `python train.py --cfg=experiments/cfgs/tests/ssd_lite_mobilenetv2_train_baseline.yml`. To train the model instead, change the setting `PHASE: ['test']` to `PHASE: ['train']`.
+To test, run the command `python3 train.py --cfg=[PATH OF CONFIG FILE]`. For example, testing the baseline SSD Mobilenetv2 is done via `python3 train.py --cfg=experiments/cfgs/tests/ssd_lite_mobilenetv2_train_baseline.yml`. To train the model instead, change the setting `PHASE: ['test']` to `PHASE: ['train']`.
 
 ## Data
 The models were trained on a custom dataset. The standard [VOC](http://host.robots.ox.ac.uk/pascal/VOC/) dataset can be used as well.

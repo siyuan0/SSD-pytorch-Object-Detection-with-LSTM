@@ -26,6 +26,7 @@ from lib.utils.config_parse import cfg
 from lib.utils.eval_utils import *
 from lib.utils.visualize_utils import *
 from lib.layers.modules.LSTM import reset_model_LSTM, trigger_TBPTT_model_LSTM
+import prune
 from prune import *
 
 class Solver(object):
