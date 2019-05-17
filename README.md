@@ -22,10 +22,13 @@ Run the docker image by `sh nsh run $(id -u)`. This will activate the docker in 
 To test, run the command `python3 train.py --cfg=[PATH OF CONFIG FILE]`. For example, testing the baseline SSD Mobilenetv2 is done via `python3 train.py --cfg=experiments/cfgs/tests/ssd_lite_mobilenetv2_train_baseline.yml`. To train the model instead, change the setting `PHASE: ['test']` to `PHASE: ['train']`.
 
 ## Data
-The models were trained on a custom dataset. The standard [VOC](http://host.robots.ox.ac.uk/pascal/VOC/) dataset can be used as well.
+The models were trained on a custom dataset. The standard [VOC](http://host.robots.ox.ac.uk/pascal/VOC/) dataset can be used as well. To see how the dataloader loads the data, run `python3 check_dataloader.py --cfg=[PATH OF CONFIG FILE]`.
 
 ## Results
-The mAP of different models are recorded in results_tracking.xlsx. It is observed that adding/removing layers do not significantly affect the mAP, but there is a significant drop in fps of the model when sufficient layers of the base mobilenetv2 are removed. This indicates that majority of the runtime is invested in processing the output of the model's forward  propagation, rather than in the forward propagation itself.
+The mAP of different models are recorded in results_tracking.xlsx. It is observed that adding/removing layers do not significantly affect the mAP, but there is a significant drop in fps of the model when sufficient layers of the base mobilenetv2 are removed. This indicates that majority of the runtime is invested in processing the output of the model's forward  propagation, rather than in the forward propagation itself. The results are documented in results_tracking.xlsx, under 'Cutting layers from model' tab.
 
 ## Effect of LSTM
 So far it looks like the LSTM layers causes the mAP to drop, while increasing the fps. This effect was observed when running it on the IR dataset.
+
+## Pruning
+Additional work was done to prune the model, under `prune.py`. The idea is from 'Pruning Filters for Efficient ConvNets' by Hao Li, et al (https://arvix.org/abs/1608.08710). To use it in your code, add this line `model = prune_model(model, factor_removed=[PROPORTION OF CHANNELS TO REMOVE])`. The model will be pruned based on its current weights, so only do this after completing training. The results are documented under 'pruning conv weights by channel' tab.

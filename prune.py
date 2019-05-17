@@ -5,6 +5,19 @@ import numpy as np
 PRUNE_ID = 0
 DEBUG_MODE = False
 
+## This code prunes all the Conv2d layers in a given pytorch model. The Conv2d are pruned by removing
+## channels based on an evaluation of their weights. The pruning is done with these restrictions:
+## 1. Each Conv2d after pruning will retain at least 1 channel
+## 2. Conv2d layers with groups != 1 or bias != False are not pruned
+## After pruning, a zero_padding layer is added to pad the output tensor up to the correct dimensions
+
+## To use the pruning, write something like model = prune_model(model, factor_removed=)
+## args: model - your pytorch model
+##       factor_removed - the proportion of layers pruning will try to remove
+
+## Idea is from 'Pruning Filters for Efficient ConvNets' by Hao Li, et al
+## (https://arvix.org/abs/1608.08710)
+
 class debug_mode(object):
     def __enter__(self):
     	global DEBUG_MODE
@@ -39,7 +52,7 @@ def unwrap_model(model):
 	return nn.ModuleList(layers)
 
 class zero_padding(nn.Module):
-	#my version of zero padding, including for the number of channels
+	#my version of zero padding, pads up to givenn number of channels, at the specified index
 	def __init__(self, num_channels, keep_channel_idx):
 		super(zero_padding, self).__init__()
 		self.num_channels = num_channels
@@ -92,12 +105,6 @@ class pruned_conv2d(nn.Module):
 			self.new_conv2d.weight = torch.nn.Parameter(torch.cat(self.keep_channel,0))
 			self.zero_padding = zero_padding(self.out_channels, self.keep_channel_idx)
 
-			# if self.groups != 1 or self.bias != None:
-			# 	self.new_mod = conv2d
-			# else:
-			# 	self.new_mod = nn.Sequential(self.new_conv2d,
-			# 								self.zero_padding)
-
 	def forward(self,x):
 		if self.groups != 1 or self.bias != None:
 			return self.new_conv2d(x)
@@ -122,13 +129,6 @@ class prune_model(nn.Module):
 		self.model = model
 		self.factor = factor_removed
 		self.modulelist = unwrap_model(self.model)
-		# self.parameters = torch.tensor([])
-		# for p in self.model.parameters():
-		# 	self.parameters = torch.cat((self.parameters,p.view(-1)))
-		# self.parameters = self.parameters.tolist()
-		# self.parameters = [abs(num) for num in self.parameters]
-		# self.parameters.sort()
-		# self.cut_off = self.parameters[int(factor_removed*len(self.parameters))]
 
 		print('number of parameters before pruning: %d' %sum([p.numel() for p in self.model.parameters()]))
 
@@ -154,8 +154,6 @@ class prune_model(nn.Module):
 		replace_inside(self.model)
 		
 		print('number of parameters after pruning: %d' %sum([p.numel() for p in self.model.parameters()]))
-		print(self.model)
-		quit()
 
 	def forward(self,x, phase='eval', use_RNN=False):
 		return self.model(x, phase, use_RNN)

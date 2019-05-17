@@ -425,7 +425,8 @@ class Solver(object):
     def test_epoch(self, model, data_loader, detector, output_dir, use_gpu, writer=None, epoch=None, printout=True):
         model.eval()
 
-        model = prune_model(model)
+        # # use this line below if you wish to prune the model. Check prune.py for details
+        # model = prune_model(model)
 
         dataset = data_loader.dataset
         num_images = len(dataset)
