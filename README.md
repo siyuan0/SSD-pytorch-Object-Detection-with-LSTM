@@ -34,4 +34,6 @@ So far it looks like the LSTM layers causes the mAP to drop, while increasing th
 Additional work was done to prune the model, under `prune.py`. The idea is from 'Pruning Filters for Efficient ConvNets' by Hao Li, et al (https://arvix.org/abs/1608.08710). To use it in your code, add this line `model = prune_model(model, factor_removed=[PROPORTION OF CHANNELS TO REMOVE])`. The model will be pruned based on its current weights, so only do this after completing training. The results are documented under 'pruning conv weights by channel' tab.  
 
 
-In short, the pruning of up to 50% of the parameters, through pruning by conv2d channels, resulted in negligible decrease in mAP and fps of the model. This can be a good way to simplify models.
+In short, the pruning of up to 50% of the parameters, through pruning by conv2d channels, resulted in negligible decrease in mAP and fps of the model. This can be a good way to simplify models.  
+
+A seperate public repo on pruning is set up at (https://github.com/siyuan0/pytorch_model_prune).
