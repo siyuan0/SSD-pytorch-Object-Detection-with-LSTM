@@ -152,6 +152,7 @@ __C.TEST = AttrDict()
 __C.TEST.BATCH_SIZE = __C.TRAIN.BATCH_SIZE
 __C.TEST.TEST_SCOPE = [0, 300]
 __C.TEST.VIDEO_BREAK = []
+__C.TEST.PRINT_IMAGES = False
 
 
 # ---------------------------------------------------------------------------- #

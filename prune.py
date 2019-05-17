@@ -152,7 +152,8 @@ class prune_model(nn.Module):
 					if m.__class__.__name__ == "Conv2d":
 						modules._modules[name] = pruned_conv2d(m, self.cut_off)
 		replace_inside(self.model)
-		
+		# print(self.model)
+		# quit()
 		print('number of parameters after pruning: %d' %sum([p.numel() for p in self.model.parameters()]))
 
 	def forward(self,x, phase='eval', use_RNN=False):

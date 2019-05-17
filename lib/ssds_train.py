@@ -28,6 +28,44 @@ from lib.utils.visualize_utils import *
 from lib.layers.modules.LSTM import reset_model_LSTM, trigger_TBPTT_model_LSTM
 import prune
 from prune import *
+from PIL import Image
+from PIL import ImageDraw
+from PIL import ImageFont
+
+IMAGE_ID = 0
+
+def print_detections(images, detections, folder='/home/chensy/pythonML/LSTM-SSD-pytorch/trainimages'):
+    global IMAGE_ID
+    def add_bbox(image, x1, y1, x_max,y_max, box_color, label):
+        #font = ImageFont.truetype("arial.ttf", 18)
+        font = ImageFont.load_default()
+        #adds the bounding box with label to image
+        img_PIL = Image.fromarray(image, mode='RGB')
+        draw = ImageDraw.Draw(img_PIL)
+        box_color = tuple(int(255*x) for x in box_color)
+        draw.line([(x1,y1),(x_max,y1),(x_max,y_max),(x1,y_max),(x1,y1)],
+                    fill=box_color[0:3], width=5)
+        text_size = draw.textsize(str(label),font)
+        draw.rectangle((x1,y1,x1+text_size[0],y1+text_size[1]),fill=box_color[0:3])
+        draw.text([x1,y1],str(label),fill=(255,255,255),font=font)
+        nparr = np.asarray(img_PIL)
+        return nparr
+    try:
+        os.mkdir(folder)
+    except:
+        pass
+    for idx in range(images.size()[0]):
+        image = images[idx].cpu().numpy().transpose((1,2,0))
+        scale = np.array([image.shape[0], image.shape[1],image.shape[0], image.shape[1]])
+        detection = detections[idx]
+        for cls_idx in range(5):
+            for det in detection[cls_idx]:
+                if det[0] > 0.6:
+                    box = det[1:].cpu().numpy() * scale
+                    image = add_bbox(image.astype('uint8'), box[0], box[1], box[2], box[3], (0.1,0.5,0.6), cls_idx)
+        cv2.imwrite(os.path.join(folder,'{i}.jpg'.format(i=IMAGE_ID)), image)
+        IMAGE_ID += 1
+        # quit()
 
 class Solver(object):
     """
@@ -435,8 +473,6 @@ class Solver(object):
         empty_array = np.transpose(np.array([[],[],[],[],[]]),(1,0))
 
         _t = Timer()
-        # _t_modelonly = Timer()
-        # fps_modelonly = []
         fps_list = [] #to track fps for calculation of average fps
         mAP_list = [] #to track mAP for each image
         for i in iter(range((num_images))):
@@ -450,18 +486,17 @@ class Solver(object):
             #resets the LSTM at specified points to treat next frame as new video
             if self.test_video_break:
                 if i in self.test_video_break:
-                    # print("video break")
                     reset_model_LSTM(model)
 
             _t.tic()
-            # _t_modelonly.tic()
-            # forward
+
             out = model(images, phase='eval')
-            # time_modelonly = _t_modelonly.toc()
-            # detect
+
             detections = detector.forward(out)
 
             time = _t.toc()
+
+            if self.cfg.TEST.PRINT_IMAGES: print_detections(images, detections)
 
             intermittent_box = [[[]] for _ in range(num_classes)] #for intermittent measuring of mAP
             # TODO: make it smart:
@@ -480,7 +515,6 @@ class Solver(object):
                 intermittent_box[j] = np.array(cls_dets) #for intermittent measuring of mAP
                 
             fps_list.append(1/time)
-            # fps_modelonly.append(1/time_modelonly)
             # if self.cfg.DATASET.DATASET == 'customRNN':
             #     #intermittent evaluation of mAP. 
             #     #There still seems to be some difference between this and evaluating at the end

@@ -63,14 +63,11 @@ def get_data():
 	batch_iterator = iter(data_loader)
 	initialized_video = False
 	video_list = []
+
 	print('collecting images')
 	for iteration in range(len(data_loader)):
 		try:
 			images, targets = next(batch_iterator)
-			if images.size()[0] != 32:
-				print(iteration)
-				print(images.size())
-				quit()
 		except StopIteration:
 			break
 		if not initialized_video:
@@ -89,15 +86,8 @@ def get_data():
 	except:
 		pass
 	for i in range(images.size()[0]):
-		# video_writer = cv2.VideoWriter('output_video{d}.avi'.format(d=i)
-		# 										,cv2.VideoWriter_fourcc(*'XVID'),12, 
-		# 										(video_list[0][0].shape[0],video_list[0][0].shape[1]))
 		for ii in range(len(video_list[i])):
 			image_out = video_list[i][ii][0].transpose((1,2,0))
-			
-			# print(image_out.astype(int))
-			# quit()
-			#add bbox
 			target_out = video_list[i][ii][1]
 
 			for bbox in target_out:
