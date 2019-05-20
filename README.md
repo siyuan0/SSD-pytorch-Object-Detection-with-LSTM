@@ -31,7 +31,7 @@ The mAP of different models are recorded in results_tracking.xlsx. It is observe
 So far it looks like the LSTM layers causes the mAP to drop, while increasing the fps. This effect was observed when running it on the IR dataset.
 
 ## Pruning
-Additional work was done to prune the model, under `prune.py`. The idea is from 'Pruning Filters for Efficient ConvNets' by Hao Li, et al (https://arvix.org/abs/1608.08710). To use it in your code, add this line `model = prune_model(model, factor_removed=[PROPORTION OF CHANNELS TO REMOVE])`. The model will be pruned based on its current weights, so only do this after completing training. The results are documented under 'pruning conv weights by channel' tab.  
+Additional work was done to prune the model, under `prune.py`. The idea is from 'Pruning Filters for Efficient ConvNets' by Hao Li, et al (https://arxiv.org/abs/1608.08710). To use it in your code, add this line `model = prune_model(model, factor_removed=[PROPORTION OF CHANNELS TO REMOVE])`. The model will be pruned based on its current weights, so only do this after completing training. The results are documented under 'pruning conv weights by channel' tab.  
 
 
 In short, the pruning of up to 50% of the parameters, through pruning by conv2d channels, resulted in negligible decrease in mAP and fps of the model. This can be a good way to simplify models.  
