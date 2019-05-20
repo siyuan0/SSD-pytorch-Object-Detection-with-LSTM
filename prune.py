@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import FLOP
 
 PRUNE_ID = 0
 DEBUG_MODE = False
@@ -131,7 +132,7 @@ class prune_model(nn.Module):
 		self.modulelist = unwrap_model(self.model)
 
 		print('number of parameters before pruning: %d' %sum([p.numel() for p in self.model.parameters()]))
-
+		print('FLOP: %d' %FLOP.count_model_param_flops(self.model, 300))
 		self.layer_eval_list = []
 		for m in self.modulelist:
 			if m.__class__.__name__ == "Conv2d":
@@ -155,7 +156,7 @@ class prune_model(nn.Module):
 		# print(self.model)
 		# quit()
 		print('number of parameters after pruning: %d' %sum([p.numel() for p in self.model.parameters()]))
-
+		print('FLOP: %d' %FLOP.count_model_param_flops(self.model, 300))
 	def forward(self,x, phase='eval', use_RNN=False):
 		return self.model(x, phase, use_RNN)
 
