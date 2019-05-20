@@ -1,4 +1,4 @@
-# Code from https://github.com/simochen/model-tools.
+# Code from https://github.com/Eric-mingjie/rethinking-network-pruning/blob/master/imagenet/l1-norm-pruning/compute_flops.py
 import numpy as np
 import os
 
