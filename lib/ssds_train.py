@@ -464,7 +464,7 @@ class Solver(object):
         model.eval()
 
         # # use this line below if you wish to prune the model. Check prune.py for details
-        # model = prune_model(model)
+        model = prune_model(model, 0.8)
 
         dataset = data_loader.dataset
         num_images = len(dataset)
@@ -473,7 +473,9 @@ class Solver(object):
         empty_array = np.transpose(np.array([[],[],[],[],[]]),(1,0))
 
         _t = Timer()
+        _t_model = Timer()
         fps_list = [] #to track fps for calculation of average fps
+        fps_model = [] #to track fps accounting only for model's forward time
         mAP_list = [] #to track mAP for each image
         for i in iter(range((num_images))):
             img = dataset.pull_image(i)
@@ -489,9 +491,9 @@ class Solver(object):
                     reset_model_LSTM(model)
 
             _t.tic()
-
+            _t_model.tic()
             out = model(images, phase='eval')
-
+            time_model = _t_model.toc()
             detections = detector.forward(out)
 
             time = _t.toc()
@@ -515,6 +517,7 @@ class Solver(object):
                 intermittent_box[j] = np.array(cls_dets) #for intermittent measuring of mAP
                 
             fps_list.append(1/time)
+            fps_model.append(1/time_model)
             # if self.cfg.DATASET.DATASET == 'customRNN':
             #     #intermittent evaluation of mAP. 
             #     #There still seems to be some difference between this and evaluating at the end
@@ -533,7 +536,7 @@ class Solver(object):
             sys.stdout.write(log)
             sys.stdout.flush()
         print('Average fps: {fps:.3f}'.format(fps=np.mean(np.array(fps_list)))) #print the average fps for this epoch
-        # print('Average modelonly fps: {fps:.3f}'.format(fps=np.mean(np.array(fps_modelonly)))) #print the average fps for this epoch
+        print('Average model fps without accounting for processing of output: {fps:.3f}'.format(fps=np.mean(np.array(fps_model)))) #print the average fps for this epoch
         
         # write result to pkl
         with open(os.path.join(output_dir, 'detections.pkl'), 'wb') as f:
