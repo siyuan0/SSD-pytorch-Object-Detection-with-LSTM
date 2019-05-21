@@ -37,3 +37,6 @@ Additional work was done to prune the model, under `prune.py`. The idea is from 
 In short, the pruning of up to 50% of the parameters, through pruning by conv2d channels, resulted in negligible decrease in mAP and fps of the model. This can be a good way to simplify models.  
 
 A seperate public repo on pruning is set up at (https://github.com/siyuan0/pytorch_model_prune).
+
+## Tensorboard
+To view tensorboard on a remote computer, add this line to your code when running `tensorboard --logdir=[LOG DIRECTORY] & `. One example is `tensorboard --logdir=experiments/models/ssd_mobilenet_v2_custom0 & python3 train.py --cfg=experiments/cfgs/tests/ssd_lite_mobilenetv2_train_baseline.yml`. This will start the tensorboard session alongside your training/testing. Doing this inside docker will set the output to port 5002. On your remote computer, open command prompt and run `ssh chensy@202.115.31.47 -L 5002:127.0.0.1:5002 -p 13022`. Lastly, open your browser and enter the url "http://127.0.0.1:5002/" to view the tensorboard.
